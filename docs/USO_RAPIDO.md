@@ -41,7 +41,25 @@ Exemplo minimo:
 
 Os campos de entidade, categoria e requerente ja vem do `.env`.
 
-## 4. Responder chamado
+## 4. Consultar chamado completo
+
+```text
+GET /tickets/{ticket_id}/full
+```
+
+## 5. Listar chamados por categoria
+
+```text
+GET /tickets/by-category/{category_id}?limit=100
+```
+
+## 6. Listar chamados por entidade
+
+```text
+GET /tickets/by-entity/{entity_id}?limit=100
+```
+
+## 7. Responder chamado
 
 ```text
 POST /tickets/{ticket_id}/followups
@@ -53,7 +71,7 @@ POST /tickets/{ticket_id}/followups
 }
 ```
 
-## 5. Solucionar chamado
+## 8. Solucionar chamado
 
 ```text
 POST /tickets/{ticket_id}/solve

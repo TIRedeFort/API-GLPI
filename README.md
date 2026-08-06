@@ -12,6 +12,9 @@ O projeto usa FastAPI e gera documentacao Swagger automaticamente em:
 
 - Testa autenticacao na API REST legada do GLPI.
 - Cria chamados.
+- Consulta chamado completo.
+- Lista chamados por categoria.
+- Lista chamados por entidade.
 - Adiciona acompanhamentos.
 - Adiciona solucao e marca chamado como solucionado.
 - Protege os endpoints com `X-API-Key`.
@@ -160,6 +163,47 @@ Tambem e possivel sobrescrever:
   "priority": 3
 }
 ```
+
+## Consultar chamado completo
+
+```http
+GET /tickets/{ticket_id}/full
+```
+
+Retorna os dados principais do chamado e relacionamentos comuns:
+
+- requerentes e atores;
+- grupos atribuidos;
+- acompanhamentos;
+- tarefas;
+- solucoes;
+- documentos.
+
+## Listar por categoria
+
+```http
+GET /tickets/by-category/{category_id}?limit=100
+```
+
+Exemplo:
+
+```http
+GET /tickets/by-category/287?limit=100
+```
+
+## Listar por entidade
+
+```http
+GET /tickets/by-entity/{entity_id}?limit=100
+```
+
+Exemplo:
+
+```http
+GET /tickets/by-entity/4?limit=100
+```
+
+O parametro `limit` define quantos chamados recentes serao consultados no GLPI antes do filtro local.
 
 ## Adicionar acompanhamento
 

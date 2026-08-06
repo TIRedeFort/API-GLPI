@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,19 @@ class CreateTicketRequest(BaseModel):
 class TicketResponse(BaseModel):
     ok: bool
     ticket: Dict[str, Any]
+
+
+class TicketFullResponse(BaseModel):
+    ok: bool
+    ticket: Dict[str, Any]
+    related: Dict[str, List[Dict[str, Any]]]
+    warnings: List[str] = Field(default_factory=list)
+
+
+class TicketListResponse(BaseModel):
+    ok: bool
+    count: int
+    tickets: List[Dict[str, Any]]
 
 
 class FollowupRequest(BaseModel):

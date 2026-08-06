@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import httpx
 from fastapi import HTTPException, status
@@ -8,6 +8,15 @@ from app.schemas.tickets import CreateTicketRequest
 
 
 class GlpiClient:
+    RELATED_TICKET_RESOURCES = {
+        "requesters_and_actors": "Ticket_User",
+        "assigned_groups": "Group_Ticket",
+        "followups": "ITILFollowup",
+        "tasks": "TicketTask",
+        "solutions": "ITILSolution",
+        "documents": "Document_Item",
+    }
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.base_url = str(settings.glpi_api_url).rstrip("/")
@@ -72,6 +81,57 @@ class GlpiClient:
         finally:
             await self.kill_session(session_token)
 
+    async def get_ticket_full(self, ticket_id: int) -> Dict[str, Any]:
+        session_token = await self.init_session()
+        try:
+            ticket = await self._request(
+                "GET",
+                f"/Ticket/{ticket_id}?expand_dropdowns=true&get_hateoas=false",
+                session_token=session_token,
+            )
+            related: Dict[str, List[Dict[str, Any]]] = {}
+            warnings: List[str] = []
+
+            for name, resource in self.RELATED_TICKET_RESOURCES.items():
+                try:
+                    data = await self._request(
+                        "GET",
+                        f"/Ticket/{ticket_id}/{resource}?range=0-999&get_hateoas=false",
+                        session_token=session_token,
+                    )
+                    related[name] = self._normalize_collection(data)
+                except HTTPException as exc:
+                    related[name] = []
+                    warnings.append(f"{name}: {exc.detail}")
+
+            return {
+                "ticket": ticket if isinstance(ticket, dict) else {"data": ticket},
+                "related": related,
+                "warnings": warnings,
+            }
+        finally:
+            await self.kill_session(session_token)
+
+    async def list_tickets_by_category(self, category_id: int, limit: int = 100) -> List[Dict[str, Any]]:
+        return await self._list_tickets_by_field("itilcategories_id", category_id, limit)
+
+    async def list_tickets_by_entity(self, entity_id: int, limit: int = 100) -> List[Dict[str, Any]]:
+        return await self._list_tickets_by_field("entities_id", entity_id, limit)
+
+    async def _list_tickets_by_field(self, field: str, value: int, limit: int) -> List[Dict[str, Any]]:
+        session_token = await self.init_session()
+        try:
+            end_range = max(limit - 1, 0)
+            data = await self._request(
+                "GET",
+                f"/Ticket?range=0-{end_range}&get_hateoas=false",
+                session_token=session_token,
+            )
+            tickets = self._normalize_collection(data)
+            return [ticket for ticket in tickets if self._safe_int(ticket.get(field)) == value]
+        finally:
+            await self.kill_session(session_token)
+
     def _build_ticket_input(self, payload: CreateTicketRequest) -> Dict[str, Any]:
         data: Dict[str, Any] = {
             "name": payload.titulo,
@@ -97,6 +157,25 @@ class GlpiClient:
         data.update(payload.glpi_fields)
         return data
 
+    @staticmethod
+    def _normalize_collection(data: Any) -> List[Dict[str, Any]]:
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+        if isinstance(data, dict):
+            rows = data.get("data")
+            if isinstance(rows, list):
+                return [item for item in rows if isinstance(item, dict)]
+            if data:
+                return [data]
+        return []
+
+    @staticmethod
+    def _safe_int(value: Any) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
     async def _request(
         self,
         method: str,
@@ -104,7 +183,7 @@ class GlpiClient:
         json: Dict[str, Any] | None = None,
         headers: Dict[str, str] | None = None,
         session_token: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> Any:
         request_headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",

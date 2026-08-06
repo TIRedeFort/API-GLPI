@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Query, status
 
 from app.api.dependencies import get_glpi_client
 from app.core.security import require_api_key
@@ -9,6 +9,8 @@ from app.schemas.tickets import (
     FollowupResponse,
     SolutionRequest,
     SolutionResponse,
+    TicketFullResponse,
+    TicketListResponse,
     TicketResponse,
 )
 from app.services.glpi_client import GlpiClient
@@ -42,6 +44,50 @@ async def session_test(client: GlpiClient = Depends(get_glpi_client)) -> Session
 async def create_ticket(payload: CreateTicketRequest, client: GlpiClient = Depends(get_glpi_client)) -> TicketResponse:
     result = await client.create_ticket(payload)
     return TicketResponse(ok=True, ticket=result)
+
+
+@router.get(
+    "/by-category/{category_id}",
+    response_model=TicketListResponse,
+    summary="Lista chamados por categoria",
+    description="Busca os chamados mais recentes dentro do limite informado e retorna apenas os da categoria GLPI enviada.",
+)
+async def list_tickets_by_category(
+    category_id: int = Path(gt=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    client: GlpiClient = Depends(get_glpi_client),
+) -> TicketListResponse:
+    tickets = await client.list_tickets_by_category(category_id, limit)
+    return TicketListResponse(ok=True, count=len(tickets), tickets=tickets)
+
+
+@router.get(
+    "/by-entity/{entity_id}",
+    response_model=TicketListResponse,
+    summary="Lista chamados por entidade",
+    description="Busca os chamados mais recentes dentro do limite informado e retorna apenas os da entidade GLPI enviada.",
+)
+async def list_tickets_by_entity(
+    entity_id: int = Path(ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    client: GlpiClient = Depends(get_glpi_client),
+) -> TicketListResponse:
+    tickets = await client.list_tickets_by_entity(entity_id, limit)
+    return TicketListResponse(ok=True, count=len(tickets), tickets=tickets)
+
+
+@router.get(
+    "/{ticket_id}/full",
+    response_model=TicketFullResponse,
+    summary="Consulta completa do chamado",
+    description="Retorna dados principais do chamado e relacionamentos comuns, como requerentes, grupos, acompanhamentos, tarefas, solucoes e documentos.",
+)
+async def get_ticket_full(
+    ticket_id: int = Path(gt=0),
+    client: GlpiClient = Depends(get_glpi_client),
+) -> TicketFullResponse:
+    result = await client.get_ticket_full(ticket_id)
+    return TicketFullResponse(ok=True, **result)
 
 
 @router.post(
