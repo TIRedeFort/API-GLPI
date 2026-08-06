@@ -11,6 +11,10 @@ from app.schemas.tickets import CreateTicketRequest
 class GlpiClient:
     SEARCH_FIELD_CATEGORY = 7
     SEARCH_FIELD_ENTITY = 80
+    SEARCH_FIELD_STATUS = 12
+    CLOSED_STATUSES = {5, 6}
+    SEARCH_PAGE_SIZE = 100
+    SEARCH_MAX_PAGES = 20
 
     RELATED_TICKET_RESOURCES = {
         "requesters_and_actors": "Ticket_User",
@@ -125,25 +129,48 @@ class GlpiClient:
     async def _search_tickets_by_field(self, search_field: int, value: int, limit: int) -> List[Dict[str, Any]]:
         session_token = await self.init_session()
         try:
-            end_range = max(limit - 1, 0)
-            params = {
-                "criteria[0][field]": search_field,
-                "criteria[0][searchtype]": "equals",
-                "criteria[0][value]": value,
-                "forcedisplay[0]": 2,
-                "forcedisplay[1]": 1,
-                "forcedisplay[2]": 7,
-                "forcedisplay[3]": 80,
-                "forcedisplay[4]": 12,
-                "range": f"0-{end_range}",
-                "rawdata": 1,
-            }
-            data = await self._request(
-                "GET",
-                f"/search/Ticket?{urlencode(params)}",
-                session_token=session_token,
-            )
-            return self._normalize_search_tickets(data)
+            tickets: List[Dict[str, Any]] = []
+            start = 0
+            total_count: int | None = None
+
+            for _ in range(self.SEARCH_MAX_PAGES):
+                page_size = min(self.SEARCH_PAGE_SIZE, max(limit * 2, self.SEARCH_PAGE_SIZE))
+                end = start + page_size - 1
+                params = {
+                    "criteria[0][field]": search_field,
+                    "criteria[0][searchtype]": "equals",
+                    "criteria[0][value]": value,
+                    "forcedisplay[0]": 2,
+                    "forcedisplay[1]": 1,
+                    "forcedisplay[2]": 7,
+                    "forcedisplay[3]": 80,
+                    "forcedisplay[4]": 12,
+                    "range": f"{start}-{end}",
+                    "rawdata": 1,
+                }
+                data = await self._request(
+                    "GET",
+                    f"/search/Ticket?{urlencode(params)}",
+                    session_token=session_token,
+                )
+                if isinstance(data, dict):
+                    total_count = self._safe_int(data.get("totalcount"))
+
+                page_tickets = self._normalize_search_tickets(data)
+                open_tickets = [
+                    ticket
+                    for ticket in page_tickets
+                    if self._safe_int(ticket.get("status")) not in self.CLOSED_STATUSES
+                ]
+                tickets.extend(open_tickets)
+
+                if len(tickets) >= limit or not page_tickets:
+                    break
+                start += page_size
+                if total_count is not None and start >= total_count:
+                    break
+
+            return tickets[:limit]
         finally:
             await self.kill_session(session_token)
 
