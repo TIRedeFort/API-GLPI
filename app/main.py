@@ -18,6 +18,7 @@ app = FastAPI(
     docs_url=f"{public_prefix}/docs" if public_prefix else "/docs",
     redoc_url=f"{public_prefix}/redoc" if public_prefix else "/redoc",
     openapi_url=f"{public_prefix}/openapi.json" if public_prefix else "/openapi.json",
+    servers=[{"url": public_prefix or "/", "description": "Servidor publico"}],
 )
 
 app.include_router(health_router)
@@ -37,6 +38,7 @@ def custom_openapi():
         description=app.description,
         routes=app.routes,
     )
+    schema["servers"] = [{"url": public_prefix or "/", "description": "Servidor publico"}]
     schema.setdefault("components", {}).setdefault("securitySchemes", {})["ApiKeyAuth"] = {
         "type": "apiKey",
         "in": "header",
