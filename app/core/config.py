@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     app_name: str = "API GLPI"
     app_env: str = "development"
     app_port: int = 8000
+    app_public_prefix: str = ""
 
     api_key: str = Field(min_length=12)
 

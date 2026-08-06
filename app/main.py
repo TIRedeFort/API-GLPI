@@ -6,6 +6,7 @@ from app.api.routes.tickets import router as tickets_router
 from app.core.config import get_settings
 
 settings = get_settings()
+public_prefix = settings.app_public_prefix.rstrip("/")
 
 app = FastAPI(
     title=settings.app_name,
@@ -14,13 +15,16 @@ app = FastAPI(
         "Use o header X-API-Key nos endpoints de chamados."
     ),
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url=f"{public_prefix}/docs" if public_prefix else "/docs",
+    redoc_url=f"{public_prefix}/redoc" if public_prefix else "/redoc",
+    openapi_url=f"{public_prefix}/openapi.json" if public_prefix else "/openapi.json",
 )
 
 app.include_router(health_router)
 app.include_router(tickets_router)
+if public_prefix:
+    app.include_router(health_router, prefix=public_prefix)
+    app.include_router(tickets_router, prefix=public_prefix)
 
 
 def custom_openapi():

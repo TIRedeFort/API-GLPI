@@ -42,6 +42,7 @@ Copie `.env.example` para `.env` e ajuste os tokens:
 
 ```env
 API_KEY=uma_chave_forte
+APP_PUBLIC_PREFIX=/api-glpi
 GLPI_API_URL=https://fortsupermercados.com.br/suporte/apirest.php
 GLPI_APP_TOKEN=...
 GLPI_USER_TOKEN=...
@@ -98,6 +99,7 @@ Configure:
 - Porta interna: `8000`
 - Healthcheck: `/health`
 - Variaveis de ambiente: copie o conteudo do `.env`
+- Para publicar em `/api-glpi`, configure `APP_PUBLIC_PREFIX=/api-glpi`
 
 Sugestao de URL:
 
@@ -105,8 +107,14 @@ Sugestao de URL:
 https://app.fortsupermercados.com.br/api-glpi
 ```
 
-Se publicar com subpath, confirme que o proxy preserva as rotas `/docs`,
-`/openapi.json`, `/health` e `/tickets`.
+Com `APP_PUBLIC_PREFIX=/api-glpi`, o Swagger fica em:
+
+```text
+https://app.fortsupermercados.com.br/api-glpi/docs
+```
+
+A API tambem continua respondendo `/health` sem prefixo para healthcheck interno
+do container.
 
 ## Criar chamado
 
