@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+from urllib.parse import urlencode
 
 import httpx
 from fastapi import HTTPException, status
@@ -8,6 +9,9 @@ from app.schemas.tickets import CreateTicketRequest
 
 
 class GlpiClient:
+    SEARCH_FIELD_CATEGORY = 7
+    SEARCH_FIELD_ENTITY = 80
+
     RELATED_TICKET_RESOURCES = {
         "requesters_and_actors": "Ticket_User",
         "assigned_groups": "Group_Ticket",
@@ -113,22 +117,33 @@ class GlpiClient:
             await self.kill_session(session_token)
 
     async def list_tickets_by_category(self, category_id: int, limit: int = 100) -> List[Dict[str, Any]]:
-        return await self._list_tickets_by_field("itilcategories_id", category_id, limit)
+        return await self._search_tickets_by_field(self.SEARCH_FIELD_CATEGORY, category_id, limit)
 
     async def list_tickets_by_entity(self, entity_id: int, limit: int = 100) -> List[Dict[str, Any]]:
-        return await self._list_tickets_by_field("entities_id", entity_id, limit)
+        return await self._search_tickets_by_field(self.SEARCH_FIELD_ENTITY, entity_id, limit)
 
-    async def _list_tickets_by_field(self, field: str, value: int, limit: int) -> List[Dict[str, Any]]:
+    async def _search_tickets_by_field(self, search_field: int, value: int, limit: int) -> List[Dict[str, Any]]:
         session_token = await self.init_session()
         try:
             end_range = max(limit - 1, 0)
+            params = {
+                "criteria[0][field]": search_field,
+                "criteria[0][searchtype]": "equals",
+                "criteria[0][value]": value,
+                "forcedisplay[0]": 2,
+                "forcedisplay[1]": 1,
+                "forcedisplay[2]": 7,
+                "forcedisplay[3]": 80,
+                "forcedisplay[4]": 12,
+                "range": f"0-{end_range}",
+                "rawdata": 1,
+            }
             data = await self._request(
                 "GET",
-                f"/Ticket?range=0-{end_range}&get_hateoas=false",
+                f"/search/Ticket?{urlencode(params)}",
                 session_token=session_token,
             )
-            tickets = self._normalize_collection(data)
-            return [ticket for ticket in tickets if self._safe_int(ticket.get(field)) == value]
+            return self._normalize_search_tickets(data)
         finally:
             await self.kill_session(session_token)
 
@@ -168,6 +183,31 @@ class GlpiClient:
             if data:
                 return [data]
         return []
+
+    @staticmethod
+    def _normalize_search_tickets(data: Any) -> List[Dict[str, Any]]:
+        if not isinstance(data, dict):
+            return []
+
+        rows = data.get("data")
+        if not isinstance(rows, list):
+            return []
+
+        tickets: List[Dict[str, Any]] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            tickets.append(
+                {
+                    "id": row.get("2"),
+                    "titulo": row.get("1"),
+                    "categoria": row.get("7"),
+                    "entidade": row.get("80"),
+                    "status": row.get("12"),
+                    "raw": row,
+                }
+            )
+        return tickets
 
     @staticmethod
     def _safe_int(value: Any) -> int | None:

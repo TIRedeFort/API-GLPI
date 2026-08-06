@@ -203,7 +203,7 @@ Exemplo:
 GET /tickets/by-entity/4?limit=100
 ```
 
-O parametro `limit` define quantos chamados recentes serao consultados no GLPI antes do filtro local.
+O parametro `limit` define quantos chamados serao retornados pela busca do GLPI. O filtro de categoria/entidade e feito diretamente na busca do GLPI.
 
 ## Adicionar acompanhamento
 
