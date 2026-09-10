@@ -59,6 +59,14 @@ class GlpiClient:
         finally:
             await self.kill_session(session_token)
 
+    async def update_ticket_status(self, ticket_id: int, new_status: int) -> Dict[str, Any]:
+        session_token = await self.init_session()
+        try:
+            body = {"input": {"status": new_status}}
+            return await self._request("PUT", f"/Ticket/{ticket_id}", json=body, session_token=session_token)
+        finally:
+            await self.kill_session(session_token)
+
     async def add_followup(self, ticket_id: int, content: str) -> Dict[str, Any]:
         session_token = await self.init_session()
         try:

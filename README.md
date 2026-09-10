@@ -205,6 +205,27 @@ GET /tickets/by-entity/4?limit=100
 
 O parametro `limit` define quantos chamados serao retornados pela busca do GLPI. O filtro de categoria/entidade e feito diretamente na busca do GLPI.
 
+## Alterar status do chamado
+
+```http
+PATCH /tickets/{ticket_id}/status
+```
+
+```json
+{
+  "status": 2
+}
+```
+
+Status GLPI:
+
+- `1`: Novo
+- `2`: Processando atribuido
+- `3`: Processando planejado
+- `4`: Pendente
+- `5`: Solucionado
+- `6`: Fechado
+
 ## Adicionar acompanhamento
 
 ```http

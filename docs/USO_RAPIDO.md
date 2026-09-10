@@ -62,6 +62,20 @@ GET /tickets/by-entity/{entity_id}?limit=100
 ## 7. Responder chamado
 
 ```text
+PATCH /tickets/{ticket_id}/status
+```
+
+```json
+{
+  "status": 2
+}
+```
+
+Status: `1` novo, `2` processando atribuido, `3` processando planejado, `4` pendente, `5` solucionado, `6` fechado.
+
+## 8. Responder chamado
+
+```text
 POST /tickets/{ticket_id}/followups
 ```
 
@@ -71,7 +85,7 @@ POST /tickets/{ticket_id}/followups
 }
 ```
 
-## 8. Solucionar chamado
+## 9. Solucionar chamado
 
 ```text
 POST /tickets/{ticket_id}/solve

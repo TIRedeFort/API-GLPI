@@ -12,6 +12,8 @@ from app.schemas.tickets import (
     TicketFullResponse,
     TicketListResponse,
     TicketResponse,
+    TicketStatusRequest,
+    TicketStatusResponse,
 )
 from app.services.glpi_client import GlpiClient
 
@@ -44,6 +46,21 @@ async def session_test(client: GlpiClient = Depends(get_glpi_client)) -> Session
 async def create_ticket(payload: CreateTicketRequest, client: GlpiClient = Depends(get_glpi_client)) -> TicketResponse:
     result = await client.create_ticket(payload)
     return TicketResponse(ok=True, ticket=result)
+
+
+@router.patch(
+    "/{ticket_id}/status",
+    response_model=TicketStatusResponse,
+    summary="Altera o status do chamado",
+    description="Atualiza apenas o campo status do chamado no GLPI. Use 1=Novo, 2=Processando atribuido, 3=Processando planejado, 4=Pendente, 5=Solucionado, 6=Fechado.",
+)
+async def update_ticket_status(
+    payload: TicketStatusRequest,
+    ticket_id: int = Path(gt=0),
+    client: GlpiClient = Depends(get_glpi_client),
+) -> TicketStatusResponse:
+    result = await client.update_ticket_status(ticket_id, payload.status)
+    return TicketStatusResponse(ok=True, ticket=result)
 
 
 @router.get(

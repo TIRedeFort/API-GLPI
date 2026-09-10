@@ -26,6 +26,20 @@ class TicketResponse(BaseModel):
     ticket: Dict[str, Any]
 
 
+class TicketStatusRequest(BaseModel):
+    status: int = Field(
+        ge=1,
+        le=6,
+        description="Status GLPI: 1=Novo, 2=Processando atribuido, 3=Processando planejado, 4=Pendente, 5=Solucionado, 6=Fechado.",
+        examples=[2],
+    )
+
+
+class TicketStatusResponse(BaseModel):
+    ok: bool
+    ticket: Dict[str, Any]
+
+
 class TicketFullResponse(BaseModel):
     ok: bool
     ticket: Dict[str, Any]
