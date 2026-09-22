@@ -205,6 +205,25 @@ GET /tickets/by-entity/4?limit=100
 
 O parametro `limit` define quantos chamados serao retornados pela busca do GLPI. O filtro de categoria/entidade e feito diretamente na busca do GLPI.
 
+## Consultar uso dos formularios
+
+Disponivel quando o plugin **Formcreator** estiver instalado e ativo no GLPI.
+
+```http
+GET /forms/usage?form_id=12&date_from=2026-09-01&date_to=2026-09-22&limit=100
+X-API-Key: sua_chave
+```
+
+Retorna cada envio do formulario com:
+
+- `answer_id`: identificador da resposta;
+- `form_id` e `form_name`: formulario utilizado;
+- `requester_id` e `requester_name`: usuario que enviou;
+- `used_at`: data e hora do envio;
+- `status`: status da resposta no Formcreator.
+
+Filtros opcionais: `form_id`, `requester_id`, `date_from`, `date_to` e `limit`.
+
 ## Alterar status do chamado
 
 ```http
