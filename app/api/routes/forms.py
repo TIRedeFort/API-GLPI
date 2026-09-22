@@ -30,6 +30,7 @@ async def list_form_usage(
     requester_id: Optional[int] = Query(default=None, gt=0, description="ID do usuario solicitante no GLPI."),
     date_from: Optional[date] = Query(default=None, description="Data inicial, no formato YYYY-MM-DD."),
     date_to: Optional[date] = Query(default=None, description="Data final, no formato YYYY-MM-DD."),
+    include_answers: bool = Query(default=True, description="Inclui perguntas e respostas preenchidas."),
     limit: int = Query(default=100, ge=1, le=500),
     client: GlpiClient = Depends(get_glpi_client),
 ) -> FormUsageResponse:
@@ -44,6 +45,7 @@ async def list_form_usage(
         requester_id=requester_id,
         date_from=date_from,
         date_to=date_to,
+        include_answers=include_answers,
         limit=limit,
     )
 
@@ -55,6 +57,7 @@ async def list_form_usage(
             requester_id=requester_id,
             date_from=date_from,
             date_to=date_to,
+            include_answers=include_answers,
         ),
         submissions=submissions,
     )

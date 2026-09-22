@@ -7,11 +7,13 @@ from fastapi import HTTPException, status
 
 from app.core.config import Settings
 from app.schemas.tickets import CreateTicketRequest
-from app.schemas.forms import FormUsageRecord
+from app.schemas.forms import FormFieldAnswer, FormUsageRecord
 
 
 class GlpiClient:
     FORM_ANSWER_TYPE = "PluginFormcreatorFormAnswer"
+    FORM_ANSWER_FIELD_TYPE = "PluginFormcreatorAnswer"
+    FORM_QUESTION_TYPE = "PluginFormcreatorQuestion"
     FORM_SEARCH_FIELD = 3
     FORM_REQUESTER_SEARCH_FIELD = 4
     FORM_DATE_SEARCH_FIELD = 6
@@ -147,6 +149,7 @@ class GlpiClient:
         requester_id: Optional[int] = None,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
+        include_answers: bool = True,
         limit: int = 100,
     ) -> List[FormUsageRecord]:
         session_token = await self.init_session()
@@ -220,9 +223,69 @@ class GlpiClient:
                 if page_number == self.SEARCH_MAX_PAGES - 1:
                     break
 
-            return rows[:limit]
+            submissions = rows[:limit]
+            if include_answers:
+                for submission in submissions:
+                    submission.answers = await self._get_form_answers(
+                        submission.answer_id,
+                        session_token,
+                    )
+
+            return submissions
         finally:
             await self.kill_session(session_token)
+
+    async def _get_form_answers(
+        self,
+        form_answer_id: int,
+        session_token: str,
+    ) -> List[FormFieldAnswer]:
+        data = await self._request(
+            "GET",
+            (
+                f"/{self.FORM_ANSWER_TYPE}/{form_answer_id}/"
+                f"{self.FORM_ANSWER_FIELD_TYPE}?range=0-999&"
+                "expand_dropdowns=true&get_hateoas=false"
+            ),
+            session_token=session_token,
+        )
+        rows = self._normalize_collection(data)
+        answers: List[FormFieldAnswer] = []
+
+        for row in rows:
+            question_value = row.get("plugin_formcreator_questions_id")
+            question_id = self._safe_int(question_value)
+            if isinstance(question_value, dict):
+                question_id = self._safe_int(
+                    question_value.get("id") or question_value.get("value")
+                )
+            question_name = self._display_value(question_value)
+            if question_id is not None and question_name == str(question_id):
+                question_name = None
+            field_type = None
+
+            if question_id is not None and not question_name:
+                question_data = await self._request(
+                    "GET",
+                    f"/{self.FORM_QUESTION_TYPE}/{question_id}?get_hateoas=false",
+                    session_token=session_token,
+                )
+                if isinstance(question_data, dict):
+                    question_name = self._display_value(question_data.get("name"))
+                    field_type = self._display_value(
+                        question_data.get("fieldtype") or question_data.get("type")
+                    )
+
+            answers.append(
+                FormFieldAnswer(
+                    question_id=question_id,
+                    question=question_name,
+                    field_type=field_type,
+                    answer=row.get("answer"),
+                )
+            )
+
+        return answers
 
     async def _search_tickets_by_field(self, search_field: int, value: int, limit: int) -> List[Dict[str, Any]]:
         session_token = await self.init_session()

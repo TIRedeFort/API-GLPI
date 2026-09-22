@@ -221,8 +221,11 @@ Retorna cada envio do formulario com:
 - `requester_id` e `requester_name`: usuario que enviou;
 - `used_at`: data e hora do envio;
 - `status`: status da resposta no Formcreator.
+- `answers`: perguntas, tipos e respostas preenchidas.
 
-Filtros opcionais: `form_id`, `requester_id`, `date_from`, `date_to` e `limit`.
+Filtros opcionais: `form_id`, `requester_id`, `date_from`, `date_to`,
+`include_answers` e `limit`. `include_answers=false` retorna somente os dados
+resumidos e evita a consulta das respostas detalhadas.
 
 ## Alterar status do chamado
 
