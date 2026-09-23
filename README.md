@@ -241,7 +241,7 @@ CREATE USER 'api_glpi_reader'@'HOST_DA_API' IDENTIFIED BY 'SENHA_FORTE';
 GRANT SELECT (id, forms_forms_id, users_id, date_creation, answers)
   ON `BANCO_GLPI`.`glpi_forms_answerssets` TO 'api_glpi_reader'@'HOST_DA_API';
 GRANT SELECT (id, name)
-  ON `BANCO_GLPI`.`glpi_forms` TO 'api_glpi_reader'@'HOST_DA_API';
+  ON `BANCO_GLPI`.`glpi_forms_forms` TO 'api_glpi_reader'@'HOST_DA_API';
 GRANT SELECT (id, name, firstname, realname)
   ON `BANCO_GLPI`.`glpi_users` TO 'api_glpi_reader'@'HOST_DA_API';
 ```

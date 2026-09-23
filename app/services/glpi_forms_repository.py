@@ -72,7 +72,7 @@ class GlpiFormsRepository:
                 a.date_creation AS used_at,
                 {answer_json} AS answer_json
             FROM `{prefix}forms_answerssets` AS a
-            INNER JOIN `{prefix}forms` AS f ON f.id = a.forms_forms_id
+            INNER JOIN `{prefix}forms_forms` AS f ON f.id = a.forms_forms_id
             LEFT JOIN `{prefix}users` AS u ON u.id = a.users_id
             WHERE 1 = 1
         """
