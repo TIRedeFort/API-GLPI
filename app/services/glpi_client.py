@@ -1,4 +1,3 @@
-from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
@@ -7,17 +6,9 @@ from fastapi import HTTPException, status
 
 from app.core.config import Settings
 from app.schemas.tickets import CreateTicketRequest
-from app.schemas.forms import FormFieldAnswer, FormUsageRecord
 
 
 class GlpiClient:
-    FORM_ANSWER_TYPE = "PluginFormcreatorFormAnswer"
-    FORM_ANSWER_FIELD_TYPE = "PluginFormcreatorAnswer"
-    FORM_QUESTION_TYPE = "PluginFormcreatorQuestion"
-    FORM_SEARCH_FIELD = 3
-    FORM_REQUESTER_SEARCH_FIELD = 4
-    FORM_DATE_SEARCH_FIELD = 6
-    FORM_ID_DISPLAY_FIELD = 9
     SEARCH_FIELD_CATEGORY = 7
     SEARCH_FIELD_ENTITY = 80
     SEARCH_FIELD_STATUS = 12
@@ -143,150 +134,6 @@ class GlpiClient:
     async def list_tickets_by_entity(self, entity_id: int, limit: int = 100) -> List[Dict[str, Any]]:
         return await self._search_tickets_by_field(self.SEARCH_FIELD_ENTITY, entity_id, limit)
 
-    async def list_form_usage(
-        self,
-        form_id: Optional[int] = None,
-        requester_id: Optional[int] = None,
-        date_from: Optional[date] = None,
-        date_to: Optional[date] = None,
-        include_answers: bool = True,
-        limit: int = 100,
-    ) -> List[FormUsageRecord]:
-        session_token = await self.init_session()
-        try:
-            criteria: List[Dict[str, Any]] = []
-            if form_id is not None:
-                criteria.append({
-                    "field": self.FORM_SEARCH_FIELD,
-                    "searchtype": "equals",
-                    "value": form_id,
-                })
-            if requester_id is not None:
-                criteria.append({
-                    "field": self.FORM_REQUESTER_SEARCH_FIELD,
-                    "searchtype": "equals",
-                    "value": requester_id,
-                })
-            if date_from is not None:
-                criteria.append({
-                    "field": self.FORM_DATE_SEARCH_FIELD,
-                    "searchtype": "morethan",
-                    "value": self._format_glpi_datetime(datetime.combine(date_from, time.min)),
-                })
-            if date_to is not None:
-                criteria.append({
-                    "field": self.FORM_DATE_SEARCH_FIELD,
-                    "searchtype": "lessthan",
-                    "value": self._format_glpi_datetime(
-                        datetime.combine(date_to + timedelta(days=1), time.min)
-                    ),
-                })
-
-            rows: List[Dict[str, Any]] = []
-            start = 0
-            page_size = min(limit, self.SEARCH_PAGE_SIZE)
-
-            for page_number in range(self.SEARCH_MAX_PAGES):
-                params: Dict[str, Any] = {
-                    "forcedisplay[0]": 2,
-                    "forcedisplay[1]": 3,
-                    "forcedisplay[2]": 4,
-                    "forcedisplay[3]": 6,
-                    "forcedisplay[4]": 8,
-                    "forcedisplay[5]": self.FORM_ID_DISPLAY_FIELD,
-                    "sort": self.FORM_DATE_SEARCH_FIELD,
-                    "order": "DESC",
-                    "range": f"{start}-{start + page_size - 1}",
-                    "rawdata": 1,
-                }
-                for index, criterion in enumerate(criteria):
-                    params[f"criteria[{index}][field]"] = criterion["field"]
-                    params[f"criteria[{index}][searchtype]"] = criterion["searchtype"]
-                    params[f"criteria[{index}][value]"] = criterion["value"]
-
-                data = await self._request(
-                    "GET",
-                    f"/search/{self.FORM_ANSWER_TYPE}?{urlencode(params)}",
-                    session_token=session_token,
-                )
-                page_rows = self._normalize_form_usage_rows(data)
-                rows.extend(page_rows)
-
-                if len(rows) >= limit or not page_rows:
-                    break
-
-                total_count = self._safe_int(data.get("totalcount")) if isinstance(data, dict) else None
-                start += page_size
-                if total_count is not None and start >= total_count:
-                    break
-
-                if page_number == self.SEARCH_MAX_PAGES - 1:
-                    break
-
-            submissions = rows[:limit]
-            if include_answers:
-                for submission in submissions:
-                    submission.answers = await self._get_form_answers(
-                        submission.answer_id,
-                        session_token,
-                    )
-
-            return submissions
-        finally:
-            await self.kill_session(session_token)
-
-    async def _get_form_answers(
-        self,
-        form_answer_id: int,
-        session_token: str,
-    ) -> List[FormFieldAnswer]:
-        data = await self._request(
-            "GET",
-            (
-                f"/{self.FORM_ANSWER_TYPE}/{form_answer_id}/"
-                f"{self.FORM_ANSWER_FIELD_TYPE}?range=0-999&"
-                "expand_dropdowns=true&get_hateoas=false"
-            ),
-            session_token=session_token,
-        )
-        rows = self._normalize_collection(data)
-        answers: List[FormFieldAnswer] = []
-
-        for row in rows:
-            question_value = row.get("plugin_formcreator_questions_id")
-            question_id = self._safe_int(question_value)
-            if isinstance(question_value, dict):
-                question_id = self._safe_int(
-                    question_value.get("id") or question_value.get("value")
-                )
-            question_name = self._display_value(question_value)
-            if question_id is not None and question_name == str(question_id):
-                question_name = None
-            field_type = None
-
-            if question_id is not None and not question_name:
-                question_data = await self._request(
-                    "GET",
-                    f"/{self.FORM_QUESTION_TYPE}/{question_id}?get_hateoas=false",
-                    session_token=session_token,
-                )
-                if isinstance(question_data, dict):
-                    question_name = self._display_value(question_data.get("name"))
-                    field_type = self._display_value(
-                        question_data.get("fieldtype") or question_data.get("type")
-                    )
-
-            answers.append(
-                FormFieldAnswer(
-                    question_id=question_id,
-                    question=question_name,
-                    field_type=field_type,
-                    answer=row.get("answer"),
-                )
-            )
-
-        return answers
-
     async def _search_tickets_by_field(self, search_field: int, value: int, limit: int) -> List[Dict[str, Any]]:
         session_token = await self.init_session()
         try:
@@ -396,56 +243,6 @@ class GlpiClient:
                 }
             )
         return tickets
-
-    @classmethod
-    def _normalize_form_usage_rows(cls, data: Any) -> List[FormUsageRecord]:
-        if not isinstance(data, dict) or not isinstance(data.get("data"), list):
-            return []
-
-        submissions: List[FormUsageRecord] = []
-        for row in data["data"]:
-            if not isinstance(row, dict):
-                continue
-
-            raw = row.get("raw") if isinstance(row.get("raw"), dict) else {}
-            answer_id = cls._safe_int(row.get("2") or raw.get("id"))
-            if answer_id is None:
-                continue
-
-            form_id = cls._safe_int(
-                raw.get("plugin_formcreator_forms_id") or row.get(str(cls.FORM_ID_DISPLAY_FIELD))
-            )
-            requester_id = cls._safe_int(raw.get("requester_id"))
-            status = cls._safe_int(raw.get("status") or row.get("8"))
-
-            submissions.append(
-                FormUsageRecord(
-                    answer_id=answer_id,
-                    form_id=form_id,
-                    form_name=cls._display_value(row.get("3") or raw.get("form_name")),
-                    requester_id=requester_id,
-                    requester_name=cls._display_value(row.get("4") or raw.get("requester_name")),
-                    used_at=raw.get("request_date") or row.get("6"),
-                    status=status,
-                )
-            )
-
-        return submissions
-
-    @staticmethod
-    def _display_value(value: Any) -> Optional[str]:
-        if value is None:
-            return None
-        if isinstance(value, dict):
-            for key in ("display", "name", "completename", "value"):
-                if value.get(key) is not None:
-                    return str(value[key])
-            return None
-        return str(value)
-
-    @staticmethod
-    def _format_glpi_datetime(value: datetime) -> str:
-        return value.strftime("%Y-%m-%d %H:%M:%S")
 
     @staticmethod
     def _safe_int(value: Any) -> int | None:

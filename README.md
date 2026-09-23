@@ -207,7 +207,10 @@ O parametro `limit` define quantos chamados serao retornados pela busca do GLPI.
 
 ## Consultar uso dos formularios
 
-Disponivel quando o plugin **Formcreator** estiver instalado e ativo no GLPI.
+O endpoint consulta os formularios nativos do GLPI 11. Como o GLPI bloqueia a
+leitura de `Glpi\\Form\\AnswersSet` pela API REST (`ERROR_RIGHT_MISSING`), a API
+usa uma conexao MySQL/MariaDB separada, somente leitura. A integracao antiga com
+Formcreator nao e usada.
 
 ```http
 GET /forms/usage?form_id=12&date_from=2026-09-01&date_to=2026-09-22&limit=100
@@ -220,12 +223,33 @@ Retorna cada envio do formulario com:
 - `form_id` e `form_name`: formulario utilizado;
 - `requester_id` e `requester_name`: usuario que enviou;
 - `used_at`: data e hora do envio;
-- `status`: status da resposta no Formcreator.
+- `status`: `null` para formularios nativos, que nao possuem esse status;
 - `answers`: perguntas, tipos e respostas preenchidas.
 
 Filtros opcionais: `form_id`, `requester_id`, `date_from`, `date_to`,
 `include_answers` e `limit`. `include_answers=false` retorna somente os dados
 resumidos e evita a consulta das respostas detalhadas.
+
+Configure no ambiente da API `GLPI_DB_HOST`, `GLPI_DB_NAME`, `GLPI_DB_USER` e
+`GLPI_DB_PASSWORD`; opcionalmente `GLPI_DB_PORT` (padrao `3306`) e
+`GLPI_DB_TABLE_PREFIX` (padrao `glpi_`). O usuario do banco deve ter somente
+permissao `SELECT` nas colunas abaixo; use o hostname interno da rede do EasyPanel
+e uma senha exclusiva:
+
+```sql
+CREATE USER 'api_glpi_reader'@'HOST_DA_API' IDENTIFIED BY 'SENHA_FORTE';
+GRANT SELECT (id, forms_forms_id, users_id, date_creation, answers)
+  ON `BANCO_GLPI`.`glpi_forms_answerssets` TO 'api_glpi_reader'@'HOST_DA_API';
+GRANT SELECT (id, name)
+  ON `BANCO_GLPI`.`glpi_forms` TO 'api_glpi_reader'@'HOST_DA_API';
+GRANT SELECT (id, name, firstname, realname)
+  ON `BANCO_GLPI`.`glpi_users` TO 'api_glpi_reader'@'HOST_DA_API';
+```
+
+Substitua os identificadores pelos valores do GLPI; o prefixo das tabelas deve
+coincidir com `GLPI_DB_TABLE_PREFIX`. O banco deve aceitar conexoes da API. Sem
+essas variaveis, os demais endpoints continuam funcionando e `/forms/usage`
+retorna `503` com uma indicacao de configuracao.
 
 ## Alterar status do chamado
 

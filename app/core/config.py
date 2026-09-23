@@ -1,4 +1,5 @@
 from functools import lru_cache
+import re
 from typing import Optional
 
 from pydantic import Field, HttpUrl, field_validator
@@ -18,6 +19,12 @@ class Settings(BaseSettings):
     glpi_api_url: HttpUrl
     glpi_app_token: str = Field(min_length=10)
     glpi_user_token: str = Field(min_length=10)
+    glpi_db_host: Optional[str] = None
+    glpi_db_port: int = Field(default=3306, ge=1, le=65535)
+    glpi_db_name: Optional[str] = None
+    glpi_db_user: Optional[str] = None
+    glpi_db_password: Optional[str] = None
+    glpi_db_table_prefix: str = "glpi_"
 
     glpi_default_entity_id: Optional[int] = None
     glpi_default_category_id: Optional[int] = None
@@ -30,6 +37,17 @@ class Settings(BaseSettings):
     glpi_default_assign_user_id: Optional[int] = None
     glpi_default_assign_group_id: Optional[int] = None
     glpi_kill_session: bool = True
+
+    @field_validator("glpi_db_table_prefix")
+    @classmethod
+    def validate_glpi_db_table_prefix(cls, value: str) -> str:
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", value):
+            raise ValueError("GLPI_DB_TABLE_PREFIX deve conter apenas letras, numeros e underscore.")
+        return value
+
+    @property
+    def glpi_db_configured(self) -> bool:
+        return all((self.glpi_db_host, self.glpi_db_name, self.glpi_db_user, self.glpi_db_password))
 
     @field_validator(
         "glpi_default_entity_id",
